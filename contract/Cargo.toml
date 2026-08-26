@@ -1,0 +1,28 @@
+[package]
+name = "z-tenant-notify"
+version = "0.1.0"
+edition = "2021"
+description = "Consent-gated transactional notifications for Terminal 3 z-space tenants — PII-safe email via host:interfaces/http-with-placeholders + a sealed provider key from z:<tid>:secrets"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+# Same dependency set as the T3N reference contract (z-tenant-flight), pinned
+# identically so the toolchain story is boring and reproducible:
+#   wit-bindgen  — WASM component bindings from wit/. no_std-friendly (no default features).
+#   serde/json   — request/response (de)serialisation, alloc-only (no std) for a lean WASM.
+#   hex          — encode the tenant DID when building the `z:<tid>:secrets` map name.
+[dependencies]
+wit-bindgen = { version = "0.49", default-features = false, features = ["macros", "realloc"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+
+# Optimised for a small, fast-to-load WASM component. Matches the reference.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

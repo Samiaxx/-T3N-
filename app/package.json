@@ -1,0 +1,26 @@
+{
+  "name": "t3n-notify-orchestrator",
+  "version": "0.1.0",
+  "description": "Deploy / grant / invoke orchestrator for the z:tenant-notify consent-gated notifications contract on Terminal 3",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build:contract": "cd ../contract && cargo build --target wasm32-wasip2 --release",
+    "test:contract": "cd ../contract && cargo test --release",
+    "typecheck": "tsc --noEmit",
+    "whoami": "tsx src/cli.ts whoami",
+    "deploy": "tsx src/cli.ts deploy",
+    "grant": "tsx src/cli.ts grant",
+    "render": "tsx src/cli.ts render",
+    "send": "tsx src/cli.ts send",
+    "all": "tsx src/cli.ts all"
+  },
+  "dependencies": {
+    "@terminal3/t3n-sdk": "^5.1.0",
+    "tsx": "^4.23.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

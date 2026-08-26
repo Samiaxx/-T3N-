@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contract:
+    name: contract — test + build wasm
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contract
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - name: Unit tests (native — pure logic)
+        run: cargo test --locked
+      - name: Build WASM component
+        run: cargo build --locked --target wasm32-wasip2 --release
+      - name: Confirm the WASM artifact exists
+        run: test -f target/wasm32-wasip2/release/z_tenant_notify.wasm
+
+  orchestrator:
+    name: orchestrator — typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+
+  secrets-guard:
+    name: secrets guard — no .env committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if any .env file is tracked
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::A .env file is tracked in git. Secrets must never be committed."
+            exit 1
+          fi
+          echo "OK: no .env files tracked."

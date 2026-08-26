@@ -1,0 +1,32 @@
+# ── Secrets: NEVER commit ──────────────────────────────
+# app/.env holds the tenant private key (T3N_API_KEY) and the Resend key.
+.env
+app/.env
+**/.env
+# (…but the template is safe and SHOULD be committed)
+!app/.env.example
+!**/.env.example
+
+# ── Dependencies ───────────────────────────────────────
+node_modules/
+
+# ── Rust build output ──────────────────────────────────
+target/
+
+# ── Local-only reference material (third-party, not ours to publish) ──
+.t3n-docs/
+reference-z-tenant-flight/
+
+# ── Scratch / local proof-of-concept files ─────────────
+app/connect.mjs
+app/introspect.mjs
+
+# ── OS noise ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Local tooling / editor state ───────────────────────
+.claude/
+
+# ── Local submission artifacts (not part of the project) ─
+/Terminal3-Submission.html

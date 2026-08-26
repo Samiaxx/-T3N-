@@ -1,0 +1,93 @@
+/// z-tenant-notify WIT world — consent-gated transactional notifications.
+///
+/// An enterprise sends a transactional email (order shipped, receipt,
+/// appointment reminder, …) to a customer using the customer's *verified*
+/// contact info and the enterprise's *sealed* provider key — where neither
+/// the recipient address nor the provider key is ever visible to the calling
+/// agent or the orchestrating app.
+///
+/// Two things stay out of WASM plaintext:
+///   1. The recipient PII (email address, name). It enters the outbound body
+///      only as `{{profile.<field>}}` markers that the host resolves from the
+///      calling user's profile at dispatch time, inside the enclave, after
+///      this contract has serialised the request. A compromised contract that
+///      reads its own body back finds the unresolved template.
+///   2. The email-provider API key. It lives in the tenant-scoped KV map
+///      `z:<tid>:secrets` (key `resend_api_key`) and is read at runtime via
+///      `host:interfaces/kv-store`. The contract puts it in the Authorization
+///      header for the outbound call; it never crosses the WIT boundary back
+///      to the caller and is never returned or logged.
+///
+/// Imports (host capabilities, granted at admit time):
+///   - tenant-context:         tenant DID → builds the `z:<tid>:secrets` name
+///   - logging:                debug / info / error lines (never PII)
+///   - kv-store:               reads the `secrets` map for the provider key
+///   - http-with-placeholders: the ONLY egress path — carries `{{profile.*}}`
+///                             markers the host resolves. There is deliberately
+///                             no plain `http` import: this contract never has
+///                             a reason to egress without the PII-safe path,
+///                             so we keep the capability surface minimal.
+package z:tenant-notify@0.1.0;
+
+world tenant-notify {
+    import host:tenant/tenant-context@1.0.0;
+    import host:interfaces/logging@2.1.0;
+    import host:interfaces/kv-store@2.1.0;
+    import host:interfaces/http-with-placeholders@2.1.0;
+
+    export contracts;
+}
+
+interface contracts {
+    /// Standard 3-field envelope used by all z-space contracts callable from
+    /// the node.
+    /// `input`        — JSON-serialised request payload specific to the function.
+    /// `user-profile` — always None for tenant contracts (hardcoded at dispatch).
+    /// `context`      — JSON-serialised DynamicContext (node-minted, trusted).
+    record generic-input {
+        input:        option<list<u8>>,
+        user-profile: option<list<u8>>,
+        context:      option<list<u8>>,
+    }
+
+    /// Dry-run: render a notification WITHOUT sending it. No egress, no PII
+    /// resolution, no credit spend on the provider. Substitutes the caller's
+    /// `{{var.<name>}}` business variables in-enclave, validates that every
+    /// `{{profile.<field>}}` marker names an allow-listed profile field, and
+    /// rejects any other placeholder namespace (e.g. `{{secrets.*}}`).
+    ///
+    /// Input  (JSON): {
+    ///   "subject_template": "Your order {{var.order_number}} has shipped",
+    ///   "body_template":    "Hi {{profile.first_name}}, order {{var.order_number}} shipped via {{var.carrier}}. Track: {{var.tracking_url}}",
+    ///   "variables":        { "order_number": "AB-10024", "carrier": "DHL", "tracking_url": "https://…" }
+    /// }
+    /// Output (JSON): {
+    ///   "subject":        "Your order AB-10024 has shipped",
+    ///   "body":           "Hi {{profile.first_name}}, order AB-10024 shipped via DHL. Track: https://…",
+    ///   "profile_fields": ["first_name"],   // still-unresolved PII markers the host will fill at send time
+    ///   "egress_host":    "api.resend.com"
+    /// }
+    /// Errors on an unresolved `{{var.*}}`, an unknown `{{profile.*}}` field,
+    /// or a disallowed placeholder namespace — so template mistakes surface
+    /// here, before a single credit or email is spent.
+    render-notification: func(req: generic-input) -> result<list<u8>, string>;
+
+    /// Render (same rules as render-notification) and SEND. Reads the sealed
+    /// provider key from `z:<tid>:secrets`, builds the provider request with
+    /// the recipient address as `{{profile.verified_contacts.email.value}}`,
+    /// and POSTs it via `host:interfaces/http-with-placeholders` so the host
+    /// resolves recipient PII inside the enclave at dispatch time.
+    ///
+    /// Input  (JSON): same shape as render-notification, plus a verified
+    ///   sender the enterprise controls:
+    ///   { "subject_template": …, "body_template": …, "variables": {…},
+    ///     "from": "notifications@acme.example",
+    ///     "reply_to": "support@acme.example"   // optional
+    ///   }
+    /// The recipient is NOT a caller-supplied field: it is always the calling
+    /// user's own verified email, resolved host-side. That is the consent
+    /// gate — the enterprise can only notify a customer who granted this agent
+    /// access to their profile, and even then never learns the address.
+    /// Output (JSON): { "provider_message_id": "…", "status": "sent" }
+    send-notification: func(req: generic-input) -> result<list<u8>, string>;
+}

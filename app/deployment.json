@@ -1,0 +1,9 @@
+{
+  "tail": "notify",
+  "version": "0.1.0",
+  "contractId": 746,
+  "scriptName": "z:6184228ea2fb5c0bfec58436e5d8e003dcfcfc2e:notify",
+  "tenantDid": "did:t3n:6184228ea2fb5c0bfec58436e5d8e003dcfcfc2e",
+  "node": "https://cn-api.sg.testnet.t3n.terminal3.io",
+  "updatedAt": "2026-08-26T17:17:01.528Z"
+}
